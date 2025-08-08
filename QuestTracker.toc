@@ -1,0 +1,6 @@
+## Interface: 50000
+## Title: Quest Tracker
+## Notes: Displays pet battle quest progress in a frame
+## Author: Leandro Ramos
+## SavedVariables: QuestTrackerDB
+QuestTracker.lua
