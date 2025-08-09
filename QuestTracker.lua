@@ -62,77 +62,106 @@ local function getQuestProgressString(questID)
     return string.format(" (%d/%d)", completed, #objectives)
 end
 
-local function isDarkmoonFaireActive()
+local dmfActive = false
+local function updateDmfStatus()
+    local wasActive = dmfActive
     local today = C_DateAndTime.GetCurrentCalendarTime()
     local numEvents = C_Calendar.GetNumDayEvents(0, today.monthDay)
     for i = 1, numEvents do
         local event = C_Calendar.GetDayEvent(0, today.monthDay, i)
         if event and event.title == "Darkmoon Faire" and event.sequenceType == "ONGOING" then
-            return true
+            dmfActive = true
+            if not wasActive then requestUpdate() end -- Update if status changed to active
+            return
         end
     end
-    return false
+    dmfActive = false
+    if wasActive then requestUpdate() end -- Update if status changed to inactive
 end
 
 local quests = {
-    {id=32604, name="Beasts of Fable Book I", showProgress=true},
-    {id=32868, name="Beasts of Fable Book II", showProgress=true},
-    {id=32869, name="Beasts of Fable Book III", showProgress=true},
-    {id=32440, name="Whispering Pandaren Spirit - Jade Forest"},
-    {id=32441, name="Thundering Pandaren Spirit - Eternal Blossoms"},
-    {id=32434, name="Burning Pandaren Spirit - Townlong Steppes"},
-    {id=32439, name="Flowing Pandaren Spirit - Dread Wastes"},
-    {id=31958, name="Aki - Eternal Blossoms"},
-    {id=31956, name="Yon - Kun-Lai Summit"},
-    {id=31955, name="Farmer Nishi - The Four Winds"},
-    {id=31954, name="Moruk - Krasarang Wilds"},
-    {id=31957, name="Shu - Dread Wastes"},
-    {id=31953, name="Hyuna - Jade Forest"},
-    {id=31991, name="Zusshi - Townlong Steppes"},
-    {id=31909, name="Trixxy - Everlook"},
-    {id=31926, name="Antari - Shadowmoon Valley"},
-    {id=31971, name="Obalis - Uldum"},
-    {id=31935, name="Major Payne - Icecrown"},
-    {id=31916, name="Lydia Accoste - Karazhan"},
-    {id=32863, name="What we've been Training for"},
-    {id=32175, name="Jeremy - Darkmoon Faire", dmfOnly=true},
+    {
+        id=32604, name="Beasts of Fable Book I", category="Pandaria", showProgress=true,
+        objectives={
+            {name="Ka'wi the Gorger", npc=68555, waypoint={map=371, x=48.4, y=71.0, title="Ka'wi the Gorger"}},
+            {name="Kafi", npc=68563, waypoint={map=379, x=35.2, y=56.0, title="Kafi"}},
+            {name="Dos-Ryga", npc=68564, waypoint={map=379, x=67.8, y=84.4, title="Dos-Ryga"}},
+            {name="Nitun", npc=68565, waypoint={map=371, x=57.0, y=29.2, title="Nitun"}},
+        }
+    },
+    {
+        id=32868, name="Beasts of Fable Book II", category="Pandaria", showProgress=true,
+        objectives={
+            {name="Greyhoof", npc=68560, waypoint={map=376, x=25.2, y=78.6, title="Greyhoof"}},
+            {name="Lucky Yi", npc=68561, waypoint={map=376, x=40.6, y=43.8, title="Lucky Yi"}},
+            {name="Skitterer Xi'a", npc=68566, waypoint={map=418, x=36.2, y=37.6, title="Skitterer Xi'a"}},
+        }
+    },
+    {
+        id=32869, name="Beasts of Fable Book III", category="Pandaria", showProgress=true,
+        objectives={
+            {name="Gorespine", npc=68558, waypoint={map=422, x=26.2, y=50.2, title="Gorespine"}},
+            {name="No-No", npc=68559, waypoint={map=390, x=11.0, y=71.0, title="No-No"}},
+            {name="Ti'un the Wanderer", npc=68562, waypoint={map=388, x=72.2, y=79.8, title="Ti'un the Wanderer"}},
+        }
+    },
+    {id=32440, name="Whispering Pandaren Spirit", category="Pandaria", waypoint={map=371, x=28.8, y=36.0, title="Whispering Pandaren Spirit"}},
+    {id=32441, name="Thundering Pandaren Spirit - Eternal Blossoms", category="Pandaria", waypoint={map=379, x=64.8, y=93.6, title="Thundering Pandaren Spirit"}},
+    {id=32434, name="Burning Pandaren Spirit - Townlong Steppes", category="Pandaria", waypoint={map=388, x=57.0, y=42.2, title="Burning Pandaren Spirit"}},
+    {id=32439, name="Flowing Pandaren Spirit - Dread Wastes", category="Pandaria", waypoint={map=422, x=61.2, y=87.6, title="Flowing Pandaren Spirit"}},
+    {id=31958, name="Aki - Eternal Blossoms", category="Pandaria", waypoint={map=390, x=67.32, y=40.49, title="Aki the Chosen"}},
+    {id=31956, name="Yon - Kun-Lai Summit", category="Pandaria", waypoint={map=379, x=35.8, y=73.6, title="Courageous Yon"}},
+    {id=31955, name="Farmer Nishi - The Four Winds", category="Pandaria", waypoint={map=376, x=46.0, y=43.6, title="Farmer Nishi"}},
+    {id=31954, name="Mo'ruk - Krasarang Wilds", category="Pandaria", waypoint={map=418, x=62.2, y=45.8, title="Mo'ruk"}},
+    {id=31957, name="Shu - Dread Wastes", category="Pandaria", waypoint={map=422, x=55.0, y=37.4, title="Wastewalker Shu"}},
+    {id=31953, name="Hyuna - Jade Forest", category="Pandaria", waypoint={map=371, x=48.0, y=54.0, title="Hyuna of the Shrines"}},
+    {id=31991, name="Zusshi - Townlong Steppes", category="Pandaria", waypoint={map=388, x=36.2, y=52.2, title="Seeker Zusshi"}},
+    {id=31909, name="Trixxy - Everlook", category="Kalimdor", waypoint={map=83, x=65.6, y=64.6, title="Stone Cold Trixxy"}},
+    {id=31926, name="Antari - Shadowmoon Valley", category="Outland", waypoint={map=104, x=30.4, y=41.8, title="Bloodknight Antari"}},
+    {id=31971, name="Obalis - Uldum", category="Kalimdor", waypoint={map=249, x=56.4, y=41.8, title="Obalis"}},
+    {id=31935, name="Major Payne - Icecrown", category="Northrend", waypoint={map=118, x=77.4, y=19.6, title="Major Payne"}},
+    {id=31916, name="Lydia Accoste - Karazhan", category="Eastern Kingdoms", waypoint={map=42, x=40.2, y=76.4, title="Lydia Accoste"}},
+    {id=32863, name="What we've been Training for", category="PvP"},
+    {id=32175, name="Jeremy - Darkmoon Faire", category="Darkmoon Island", dmfOnly=true},
 }
 
 local optionalQuests = {
-    {id=31693, name="Julia Stevens - Elwynn Forest"},
-    {id=31972, name="Brok - Mount Hyjal"},
-    {id=31780, name="Old MacDonald - Westfall"},
-    {id=31932, name="Nearly Headless Jacob - Crystalsong Forest"},
-    {id=31923, name="Ras'an - Zangarmarsh"},
-    {id=31862, name="Zonya the Sadist - Stonetalon Mountains"},
-    {id=31924, name="Narrok - Nagrand"},
-    {id=31934, name="Gutretch - Zul'Drak"},
-    {id=31872, name="Merda Stronghoof - Desolace"},
-    {id=31818, name="Zunta - Durotar"},
-    {id=31922, name="Nicki Tinytech - Hellfire Peninsula"},
-    {id=31931, name="Beegle Blastfuse - Howling Fjord"},
-    {id=31819, name="Dagra the Fierce - Northern Barrens"},
-    {id=31973, name="Bordin Steadyfist - Deepholm"},
-    {id=31781, name="Lindsay - Redridge Mountains"},
-    {id=31933, name="Okrut Dragonwaste - Dragonblight"},
-    {id=31925, name="Morulu the Elder - Shattrath City"},
-    {id=31851, name="Bill Buckler - Cape of Stranglethorn"},
-    {id=31905, name="Grazzle the Great - Dustwallow Marsh"},
-    {id=31910, name="David Kosse - The Hinterlands"},
-    {id=31907, name="Zoltan - Felwood"},
-    {id=31871, name="Traitor Gluk - Feralas"},
-    {id=31908, name="Elena Flutterfly - Moonglade"},
-    {id=31914, name="Durin Darkhammer - Burning Steppes"},
-    {id=31850, name="Eric Davidson - Burning Steppes"},
-    {id=31904, name="Cassandra Kaboom - Northern Stranglethorn"},
-    {id=31852, name="Steven Lisbane - Deadwind Pass"},
-    {id=31906, name="Kela Grimtotem - Thousand Needles"},
-    {id=31912, name="Kortas Darkhammer - Searing Gorge"},
-    {id=31854, name="Analynn - Ashenvale"},
-    {id=31911, name="Deiza Plaguehorn - Eastern Plaguelands"},
-    {id=31913, name="Everessa - Swamp of Sorrows"},
-    {id=31974, name="Goz Banefury - Twilight Highlands"},
+    {id=31693, name="Julia Stevens - Elwynn Forest", category="Eastern Kingdoms", waypoint={map=37, x=41.6, y=83.6, title="Julia Stevens"}},
+    {id=31972, name="Brok - Mount Hyjal", category="Kalimdor", waypoint={map=198, x=61.4, y=32.8, title="Brok"}},
+    {id=31780, name="Old MacDonald - Westfall", category="Eastern Kingdoms", waypoint={map=52, x=60.8, y=18.4, title="Old MacDonald"}},
+    {id=31932, name="Nearly Headless Jacob - Crystalsong Forest", category="Northrend", waypoint={map=127, x=50.2, y=59.0, title="Nearly Headless Jacob"}},
+    {id=31923, name="Ras'an - Zangarmarsh", category="Outland", waypoint={map=102, x=17.2, y=50.4, title="Ras'an"}},
+    {id=31862, name="Zonya the Sadist - Stonetalon Mountains", category="Kalimdor", faction="Horde",waypoint={map=65, x=59.6, y=71.4, title="Zonya the Sadist"}},
+    {id=31924, name="Narrok - Nagrand", category="Outland", waypoint={map=107, x=61.0, y=49.4, title="Narrok"}},
+    {id=31934, name="Gutretch - Zul'Drak", category="Northrend", waypoint={map=121, x=13.2, y=66.8, title="Gutretch"}},
+    {id=31872, name="Merda Stronghoof - Desolace", category="Kalimdor", faction="Horde",waypoint={map=66, x=57.2, y=45.8, title="Merda Stronghoof"}},
+    {id=31818, name="Zunta - Durotar", category="Kalimdor", faction="Horde",waypoint={map=1, x=43.8, y=28.8, title="Zunta"}},
+    {id=31922, name="Nicki Tinytech - Hellfire Peninsula", category="Outland", waypoint={map=100, x=64.4, y=49.2, title="Nicki Tinytech"}},
+    {id=31931, name="Beegle Blastfuse - Howling Fjord", category="Northrend", waypoint={map=117, x=28.6, y=33.8, title="Beegle Blastfuse"}},
+    {id=31819, name="Dagra the Fierce - Northern Barrens", category="Kalimdor", faction="Horde",waypoint={map=10, x=58.6, y=53.0, title="Dagra the Fierce"}},
+    {id=31973, name="Bordin Steadyfist - Deepholm", category="Elemental Plane", waypoint={map=207, x=49.8, y=57.0, title="Bordin Steadyfist"}},
+    {id=31781, name="Lindsay - Redridge Mountains", category="Eastern Kingdoms", waypoint={map=49, x=33.2, y=52.4, title="Lindsay"}},
+    {id=31933, name="Okrut Dragonwaste - Dragonblight", category="Northrend", waypoint={map=115, x=59.0, y=77.0, title="Okrut Dragonwaste"}},
+    {id=31925, name="Morulu the Elder - Shattrath City", category="Outland", waypoint={map=111, x=58.6, y=69.2, title="Morulu the Elder"}},
+    {id=31851, name="Bill Buckler - Cape of Stranglethorn", category="Eastern Kingdoms", waypoint={map=210, x=51.4, y=73.2, title="Bill Buckler"}},
+    {id=31905, name="Grazzle the Great - Dustwallow Marsh", category="Kalimdor", faction="Horde",waypoint={map=70, x=53.8, y=74.8, title="Grazzle the Great"}},
+    {id=31910, name="David Kosse - The Hinterlands", category="Eastern Kingdoms", waypoint={map=26, x=62.8, y=54.4, title="David Kosse"}},
+    {id=31907, name="Zoltan - Felwood", category="Kalimdor", faction="Horde",waypoint={map=77, x=40.0, y=56.4, title="Zoltan"}},
+    {id=31871, name="Traitor Gluk - Feralas", category="Kalimdor", faction="Horde",waypoint={map=69, x=59.6, y=49.6, title="Traitor Gluk"}},
+    {id=31908, name="Elena Flutterfly - Moonglade", category="Kalimdor", faction="Horde",waypoint={map=80, x=46.0, y=60.4, title="Elena Flutterfly"}},
+    {id=31914, name="Durin Darkhammer - Burning Steppes", category="Eastern Kingdoms", waypoint={map=36, x=25.4, y=47.4, title="Durin Darkhammer"}},
+    {id=31850, name="Eric Davidson - Duskwood", category="Eastern Kingdoms", waypoint={map=47, x=19.8, y=44.8, title="Eric Davidson"}},
+    {id=31904, name="Cassandra Kaboom - Southern Barrens", category="Kalimdor", faction="Horde",waypoint={map=199, x=39.6, y=79.2, title="Cassandra Kaboom"}},
+    {id=31852, name="Steven Lisbane - Northern Stranglethorn", category="Eastern Kingdoms", waypoint={map=50, x=46.0, y=40.4, title="Steven Lisbane"}},
+    {id=31906, name="Kela Grimtotem - Thousand Needles", category="Kalimdor", faction="Horde",waypoint={map=64, x=31.8, y=32.8 , title="Kela Grimtotem"}},
+    {id=31912, name="Kortas Darkhammer - Searing Gorge", category="Eastern Kingdoms", waypoint={map=32, x=35.6, y=27.8, title="Kortas Darkhammer"}},
+    {id=31854, name="Analynn - Ashenvale", category="Kalimdor", faction="Horde",waypoint={map=63, x=20.0, y=29.4, title="Analynn"}},
+    {id=31911, name="Deiza Plaguehorn - Eastern Plaguelands", category="Eastern Kingdoms", waypoint={map=23, x=67.0, y=52.4, title="Deiza Plaguehorn"}},
+    {id=31913, name="Everessa - Swamp of Sorrows", category="Eastern Kingdoms", waypoint={map=51, x=76.6, y=41.6, title="Everessa"}},
+    {id=31974, name="Goz Banefury", category="Eastern Kingdoms", waypoint={map=241, x=56.4, y=56.8, title="Goz Banefury"}},
 }
+
+
 
 table.sort(quests, function(a, b) return a.name < b.name end)
 table.sort(optionalQuests, function(a, b) return a.name < b.name end)
@@ -186,6 +215,8 @@ local function createConfigFrame()
     configFrame:SetScript("OnDragStart", configFrame.StartMoving)
     configFrame:SetScript("OnDragStop", configFrame.StopMovingOrSizing)
 
+    local playerFaction = UnitFactionGroup("player")
+
     local title = configFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
     title:SetPoint("TOP", 0, -10)
     title:SetText("Quest Tracker Configuration")
@@ -212,32 +243,36 @@ local function createConfigFrame()
 
     -- Main quest checkboxes
     for i, q in ipairs(quests) do
-        local cb = CreateFrame("CheckButton", nil, content, "ChatConfigCheckButtonTemplate")
-        cb:SetPoint("TOPLEFT", 0, -y)
-        cb.Text:SetText(q.name)
-        cb:SetChecked(isQuestEnabled(q.id))
-        cb:SetScript("OnClick", function(self)
-            setQuestEnabled(q.id, self:GetChecked())
-        end)
-        y = y + 24
+        if not q.faction or q.faction == playerFaction then
+            local cb = CreateFrame("CheckButton", nil, content, "ChatConfigCheckButtonTemplate")
+            cb:SetPoint("TOPLEFT", 0, -y)
+            cb.Text:SetText(q.name)
+            cb:SetChecked(isQuestEnabled(q.id))
+            cb:SetScript("OnClick", function(self)
+                setQuestEnabled(q.id, self:GetChecked())
+            end)
+            y = y + 24
+        end
     end
 
     -- Optional quests label
     local optLabel = content:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     optLabel:SetPoint("TOPLEFT", 0, -y - 8)
     optLabel:SetText("Optional Dailies (No Sack of Pet Supplies)")
-    y = y + 28
+    y = y + 32
 
     -- Optional quest checkboxes
     for i, q in ipairs(optionalQuests) do
-        local cb = CreateFrame("CheckButton", nil, content, "ChatConfigCheckButtonTemplate")
-        cb:SetPoint("TOPLEFT", 0, -y)
-        cb.Text:SetText(q.name)
-        cb:SetChecked(isQuestEnabled(q.id))
-        cb:SetScript("OnClick", function(self)
-            setQuestEnabled(q.id, self:GetChecked())
-        end)
-        y = y + 24
+        if not q.faction or q.faction == playerFaction then
+            local cb = CreateFrame("CheckButton", nil, content, "ChatConfigCheckButtonTemplate")
+            cb:SetPoint("TOPLEFT", 0, -y)
+            cb.Text:SetText(q.name)
+            cb:SetChecked(isQuestEnabled(q.id))
+            cb:SetScript("OnClick", function(self)
+                setQuestEnabled(q.id, self:GetChecked())
+            end)
+            y = y + 24
+        end
     end
 
     content:SetHeight(y)
@@ -254,53 +289,269 @@ SlashCmdList["QUESTTRACKER"] = function(msg)
     end
 end
 
--- Update updateQuestText to include optionalQuests
-local function updateQuestText()
-    local dmfActive = isDarkmoonFaireActive()
-    local lines = {}
+-- Table to hold clickable line buttons
+local questLineButtons = {}
+local beastObjectiveButtons = {}
 
+local collapsedQuests = {}
+
+local function groupQuestsByCategory(questList)
+    local categories = {}
+    for _, q in ipairs(questList) do
+        local cat = q.category or "Other"
+        if not categories[cat] then categories[cat] = {} end
+        table.insert(categories[cat], q)
+    end
+    return categories
+end
+
+local function updateQuestText()
+    local playerFaction = UnitFactionGroup("player")
+    local questEntries = {}
     for _, q in ipairs(quests) do
-        if isQuestEnabled(q.id) then
-            if not q.dmfOnly or dmfActive then
-                if not C_QuestLog.IsQuestFlaggedCompleted(q.id) then
-                    local displayName = q.name
-                    if q.showProgress then
-                        displayName = displayName .. getQuestProgressString(q.id)
-                    end
-                    table.insert(lines, displayName)
-                end
-            end
+        if isQuestEnabled(q.id) and (not q.dmfOnly or dmfActive) and not C_QuestLog.IsQuestFlaggedCompleted(q.id) and (not q.faction or q.faction == playerFaction) then
+            table.insert(questEntries, q)
         end
     end
     for _, q in ipairs(optionalQuests) do
-        if isQuestEnabled(q.id) then
-            if not C_QuestLog.IsQuestFlaggedCompleted(q.id) then
-                table.insert(lines, q.name)
+        if isQuestEnabled(q.id) and not C_QuestLog.IsQuestFlaggedCompleted(q.id) and (not q.faction or q.faction == playerFaction) then
+            table.insert(questEntries, q)
+        end
+    end
+
+    local categories = groupQuestsByCategory(questEntries)
+    local orderedCategories = {
+        "Kalimdor", "Eastern Kingdoms", "Outland", "Northrend", "Elemental Plane",
+        "Darkmoon Island", "Pandaria", "PvP", "Other"
+    }
+
+    -- Find the last category that will actually be displayed
+    local lastVisibleCategory
+    for i = #orderedCategories, 1, -1 do
+        local catName = orderedCategories[i]
+        if categories[catName] and #categories[catName] > 0 then
+            lastVisibleCategory = catName
+            break
+        end
+    end
+
+    -- Find the widest line for sizing
+    local maxWidth = 0
+    local tempFont = text
+
+    -- Check category header widths (they use a different, larger font)
+    tempFont:SetFontObject(GameFontNormal)
+    for catName, _ in pairs(categories) do
+        tempFont:SetText(catName)
+        local w = tempFont:GetStringWidth()
+        if w > maxWidth then maxWidth = w end
+    end
+    tempFont:SetFontObject(GameFontHighlightSmall) -- Set it back for quests
+
+    for _, q in ipairs(questEntries) do
+        local isComplete = IsQuestComplete(q.id)
+        local isTurnedIn = C_QuestLog.IsQuestFlaggedCompleted(q.id)
+        local displayName = q.name
+        if q.showProgress then
+            displayName = displayName .. getQuestProgressString(q.id)
+        end
+        -- Add the "!" icon at the end if completed-but-not-turned-in
+        if not q.objectives and isComplete and not isTurnedIn then
+            displayName = "|cffffff00" .. displayName .. "|r  |TInterface\\GossipFrame\\AvailableQuestIcon:16:16:0:0|t"
+        end
+        tempFont:SetText(displayName)
+        local w = tempFont:GetStringWidth()
+        if w > maxWidth then maxWidth = w end
+
+        -- Check for objectives
+        if q.objectives then
+            for _, obj in ipairs(q.objectives) do
+                tempFont:SetText("    " .. obj.name)
+                local w2 = tempFont:GetStringWidth()
+                if w2 > maxWidth then maxWidth = w2 end
             end
         end
     end
 
-    if #lines == 0 then
-        frame:Hide()
-        return
-    end
+    text:SetText("")
+    text:SetWidth(maxWidth)
+    local lineHeight = text:GetLineHeight()
+    local totalLines = 0
 
-    -- Find the widest line
-    local maxWidth = 0
-    for _, line in ipairs(lines) do
-        text:SetText(line)
-        local w = text:GetStringWidth()
-        if w > maxWidth then
-            maxWidth = w
+    -- Draw quest lines and objectives
+    local btnIdx, objBtnIdx = 1, 1
+    for _, cat in ipairs(orderedCategories) do
+        local catQuests = categories[cat]
+        if catQuests and #catQuests > 0 then
+            -- Draw category header
+            local catBtn = questLineButtons[btnIdx] or CreateFrame("Button", nil, content)
+            if not questLineButtons[btnIdx] then
+                catBtn.text = catBtn:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+                catBtn.text:SetJustifyH("LEFT")
+                catBtn.text:SetJustifyV("TOP")
+                catBtn.text:SetPoint("LEFT")
+                catBtn.text:SetPoint("RIGHT")
+                questLineButtons[btnIdx] = catBtn
+            end
+            catBtn:Show()
+            catBtn:SetPoint("TOPLEFT", content, "TOPLEFT", 0, -((totalLines) * lineHeight))
+            catBtn:SetSize(maxWidth, lineHeight)
+            catBtn:SetHighlightTexture("")
+            catBtn.text:SetFontObject(GameFontNormal)
+            catBtn.text:SetText(cat)
+            catBtn:SetScript("OnClick", nil)
+            catBtn:SetScript("OnEnter", nil)
+            catBtn:SetScript("OnLeave", nil)
+            btnIdx = btnIdx + 1
+            totalLines = totalLines + 1
+
+            -- Draw quests in this category
+            for _, q in ipairs(catQuests) do
+                -- Main quest line
+                local btn = questLineButtons[btnIdx] or CreateFrame("Button", nil, content)
+                if not questLineButtons[btnIdx] then
+                    btn.text = btn:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+                    btn.text:SetJustifyH("LEFT")
+                    btn.text:SetJustifyV("TOP")
+                    btn.text:SetPoint("LEFT")
+                    btn.text:SetPoint("RIGHT")
+                    questLineButtons[btnIdx] = btn
+                end
+                btn:Show()
+                btn:SetPoint("TOPLEFT", content, "TOPLEFT", 0, -((totalLines) * lineHeight))
+                btn:SetSize(maxWidth, lineHeight)
+                btn:SetHighlightTexture("Interface\\QuestFrame\\UI-QuestTitleHighlight")
+                local isComplete = IsQuestComplete(q.id)
+                local isTurnedIn = C_QuestLog.IsQuestFlaggedCompleted(q.id)
+                local displayName = q.name
+                if q.showProgress then
+                    displayName = displayName .. getQuestProgressString(q.id)
+                end
+
+                -- Visual feedback for completed-but-not-turned-in quests (not Beasts of Fable)
+                if not q.objectives and isComplete and not isTurnedIn then
+                    displayName = "|TInterface\\GossipFrame\\AvailableQuestIcon:16:16:0:0|t |cffffff00" .. displayName .. "|r"
+                end
+
+                btn.text:SetFontObject(GameFontHighlightSmall)
+                btn.text:SetText(displayName)
+                btn:SetScript("OnClick", nil)
+                btn:SetScript("OnEnter", nil)
+                btn:SetScript("OnLeave", nil)
+
+                if q.objectives then
+                    -- Collapse/expand for Beasts of Fable
+                    btn:SetScript("OnClick", function()
+                        collapsedQuests[q.id] = not collapsedQuests[q.id]
+                        updateQuestText()
+                    end)
+                    btn:SetScript("OnEnter", function(self)
+                        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+                        GameTooltip:SetText(collapsedQuests[q.id] and "Expand" or "Collapse", 1, 1, 1)
+                        GameTooltip:Show()
+                    end)
+                    btn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+                elseif q.waypoint and TomTom then
+                    btn:SetScript("OnClick", function()
+                        if TomTom.RemoveAllWaypoints then
+                            TomTom:RemoveAllWaypoints()
+                        end
+                        TomTom:AddWaypoint(q.waypoint.map, q.waypoint.x/100, q.waypoint.y/100, {title=q.waypoint.title or q.name})
+                    end)
+                    btn:SetScript("OnEnter", function(self)
+                        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+                        if isComplete and not isTurnedIn then
+                            GameTooltip:SetText("Quest complete!\n|cffffcc00Don't forget to turn in for rewards!|r", 1, 1, 1)
+                        else
+                            GameTooltip:SetText("Set TomTom waypoint for " .. (q.waypoint.title or q.name), 1, 1, 1)
+                        end
+                        GameTooltip:Show()
+                    end)
+                    btn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+                end
+
+                btnIdx = btnIdx + 1
+                totalLines = totalLines + 1
+
+                -- Objectives (for Beasts of Fable)
+                if q.objectives and not collapsedQuests[q.id] then
+                    local objectives = C_QuestLog.GetQuestObjectives(q.id)
+                    for objIdx, beast in ipairs(q.objectives) do
+                        local beastBtn = beastObjectiveButtons[objBtnIdx] or CreateFrame("Button", nil, content)
+                        if not beastObjectiveButtons[objBtnIdx] then
+                            beastBtn:SetHighlightTexture("Interface\\QuestFrame\\UI-QuestTitleHighlight")
+                            beastBtn.text = beastBtn:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+                            beastBtn.text:SetJustifyH("LEFT")
+                            beastBtn.text:SetJustifyV("TOP")
+                            beastBtn.text:SetPoint("LEFT")
+                            beastBtn.text:SetPoint("RIGHT")
+                            beastObjectiveButtons[objBtnIdx] = beastBtn
+                        end
+                        beastBtn:Show()
+                        beastBtn:SetPoint("TOPLEFT", content, "TOPLEFT", 0, -((totalLines) * lineHeight))
+                        beastBtn:SetSize(maxWidth, lineHeight)
+
+                        -- Determine completion
+                        local completed = false
+                        if objectives and objectives[objIdx] and objectives[objIdx].finished then
+                            completed = true
+                        end
+
+                        -- Visual feedback: strikethrough if completed, checkbox otherwise
+                        local beastText = "    "
+                        if completed then
+                            beastText = beastText .. "|cFF888888|TInterface\\Buttons\\UI-CheckBox-Check:16:16:0:0|t|r " .. "|cFF888888" .. beast.name .. "|r"
+                        else
+                            beastText = beastText .. "|TInterface\\Buttons\\UI-CheckBox-Up:16:16:0:0|t " .. beast.name
+                        end
+                        beastBtn.text:SetText(beastText)
+
+                        -- TomTom waypoint on click
+                        beastBtn:SetScript("OnClick", nil)
+                        beastBtn:SetScript("OnEnter", nil)
+                        beastBtn:SetScript("OnLeave", nil)
+                        if beast.waypoint and TomTom then
+                            beastBtn:SetScript("OnClick", function()
+                                if TomTom.RemoveWaypoints then
+                                    TomTom:RemoveWaypoints()
+                                end
+                                TomTom:AddWaypoint(beast.waypoint.map, beast.waypoint.x/100, beast.waypoint.y/100, {title=beast.waypoint.title or beast.name})
+                            end)
+                            beastBtn:SetScript("OnEnter", function(self)
+                                GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+                                GameTooltip:SetText("Set TomTom waypoint for " .. (beast.waypoint.title or beast.name), 1, 1, 1)
+                                GameTooltip:Show()
+                            end)
+                            beastBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+                        end
+
+                        objBtnIdx = objBtnIdx + 1
+                        totalLines = totalLines + 1
+                    end
+                end
+            end
+
+            -- Add 10px spacing after the category block, but not for the last one
+            if cat ~= lastVisibleCategory then
+                totalLines = totalLines + (10 / lineHeight)
+            end
         end
     end
 
-    -- Restore full text and set final size
-    text:SetText(table.concat(lines, "\n"))
-    text:SetWidth(maxWidth)
-    local height = text:GetStringHeight()
-    frame:SetSize(maxWidth + PADDING * 2, height + PADDING * 2)
-    frame:Show()
+    -- Hide unused buttons
+    for i = btnIdx, #questLineButtons do
+        questLineButtons[i]:Hide()
+    end
+    for i = objBtnIdx, #beastObjectiveButtons do
+        beastObjectiveButtons[i]:Hide()
+    end
+
+    if totalLines > 0 then
+        frame:SetSize(maxWidth + PADDING * 2, totalLines * lineHeight + PADDING * 2)
+        frame:Show()
+    else
+        frame:Hide()
+    end
 end
 
 local function updateTracker()
@@ -332,6 +583,7 @@ frame:RegisterEvent("PLAYER_EQUIPMENT_CHANGED")
 frame:RegisterEvent("QUEST_ACCEPTED")
 frame:RegisterEvent("QUEST_TURNED_IN")
 frame:RegisterEvent("QUEST_LOG_UPDATE")
+frame:RegisterEvent("CALENDAR_UPDATE_EVENT_LIST")
 
 frame:SetScript("OnEvent", function(self, event, arg1, ...)
     if event == "ADDON_LOADED" and arg1 == addonName then
@@ -355,6 +607,12 @@ frame:SetScript("OnEvent", function(self, event, arg1, ...)
         local relativeFrame = _G[db.position.relativeTo] or UIParent
         frame:SetPoint(db.position.point, relativeFrame, db.position.relativePoint, db.position.xOfs, db.position.yOfs)
         return -- Don't update on load, wait for other events
+    end
+
+    if event == "PLAYER_ENTERING_WORLD" then
+        updateDmfStatus()
+    elseif event == "CALENDAR_UPDATE_EVENT_LIST" then
+        updateDmfStatus()
     end
 
     -- For all other events, request an update
