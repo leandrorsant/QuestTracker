@@ -63,21 +63,59 @@ local function getQuestProgressString(questID)
 end
 
 local dmfActive = false
+-- local function updateDmfStatus()
+--     local wasActive = dmfActive
+--     local today = C_DateAndTime.GetCurrentCalendarTime()
+--     local numEvents = C_Calendar.GetNumDayEvents(0, today.monthDay)
+--     for i = 1, numEvents do
+--         local event = C_Calendar.GetDayEvent(0, today.monthDay, i)
+--         print(event.title)
+--         if event and event.title == "Darkmoon Faire" and event.sequenceType == "ONGOING" then
+--             dmfActive = true
+--             if not wasActive then requestUpdate() end -- Update if status changed to active
+--             return
+--         end
+--     end
+--     dmfActive = false
+--     if wasActive then requestUpdate() end -- Update if status changed to inactive
+-- end
 local function updateDmfStatus()
     local wasActive = dmfActive
-    local today = C_DateAndTime.GetCurrentCalendarTime()
-    local numEvents = C_Calendar.GetNumDayEvents(0, today.monthDay)
+    local currentDate = C_DateAndTime.GetCurrentCalendarTime()
+
+    -- Calculate the first day of the current week (Sunday)
+    local currentWeekday = currentDate.weekday  -- 1 = Sunday, 2 = Monday, etc.
+    local firstDayOfWeek = currentDate.monthDay - (currentWeekday - 1)
+
+    -- Month offset: 0 = current month, -1 = previous month (if firstDayOfWeek < 1)
+    local monthOffset = 0
+    if firstDayOfWeek < 1 then
+        monthOffset = -1
+        local prevMonthInfo = C_Calendar.GetMonthInfo(monthOffset)
+        firstDayOfWeek = prevMonthInfo.numDays + firstDayOfWeek
+    end
+
+    -- Default to inactive
+    dmfActive = false
+
+    -- Check all events on that Sunday for Darkmoon Faire with eventType == 4
+    local numEvents = C_Calendar.GetNumDayEvents(monthOffset, firstDayOfWeek)
     for i = 1, numEvents do
-        local event = C_Calendar.GetDayEvent(0, today.monthDay, i)
-        if event and event.title == "Darkmoon Faire" and event.sequenceType == "ONGOING" then
+        local event = C_Calendar.GetDayEvent(monthOffset, firstDayOfWeek, i)
+        if event and event.title == "Darkmoon Faire" and event.eventType == 4 then
             dmfActive = true
-            if not wasActive then requestUpdate() end -- Update if status changed to active
-            return
+            break
         end
     end
-    dmfActive = false
-    if wasActive then requestUpdate() end -- Update if status changed to inactive
+
+    -- Fire update if the active state changed
+    if dmfActive ~= wasActive then
+        requestUpdate()
+    end
 end
+
+
+
 
 local quests = {
     {
@@ -305,6 +343,255 @@ local function groupQuestsByCategory(questList)
     return categories
 end
 
+-- local function updateQuestText()
+--     local playerFaction = UnitFactionGroup("player")
+--     local questEntries = {}
+--     for _, q in ipairs(quests) do
+--         if isQuestEnabled(q.id) and (not q.dmfOnly or dmfActive) and not C_QuestLog.IsQuestFlaggedCompleted(q.id) and (not q.faction or q.faction == playerFaction) then
+--             table.insert(questEntries, q)
+--         end
+--     end
+--     for _, q in ipairs(optionalQuests) do
+--         if isQuestEnabled(q.id) and not C_QuestLog.IsQuestFlaggedCompleted(q.id) and (not q.faction or q.faction == playerFaction) then
+--             table.insert(questEntries, q)
+--         end
+--     end
+
+--     local categories = groupQuestsByCategory(questEntries)
+--     local orderedCategories = {
+--         "Kalimdor", "Eastern Kingdoms", "Outland", "Northrend", "Elemental Plane",
+--         "Darkmoon Island", "Pandaria", "PvP", "Other"
+--     }
+
+--     -- Find the last category that will actually be displayed
+--     local lastVisibleCategory
+--     for i = #orderedCategories, 1, -1 do
+--         local catName = orderedCategories[i]
+--         if categories[catName] and #categories[catName] > 0 then
+--             lastVisibleCategory = catName
+--             break
+--         end
+--     end
+
+--     -- Find the widest line for sizing
+--     local maxWidth = 0
+--     local tempFont = text
+
+--     -- Check category header widths (they use a different, larger font)
+--     tempFont:SetFontObject(GameFontNormal)
+--     for catName, _ in pairs(categories) do
+--         tempFont:SetText(catName)
+--         local w = tempFont:GetStringWidth()
+--         if w > maxWidth then maxWidth = w end
+--     end
+--     tempFont:SetFontObject(GameFontHighlightSmall) -- Set it back for quests
+
+--     for _, q in ipairs(questEntries) do
+--         local isComplete = IsQuestComplete(q.id)
+--         local isTurnedIn = C_QuestLog.IsQuestFlaggedCompleted(q.id)
+--         local displayName = q.name
+--         if q.showProgress then
+--             displayName = displayName .. getQuestProgressString(q.id)
+--         end
+--         -- Add the "!" icon at the end if completed-but-not-turned-in
+--         if not q.objectives and isComplete and not isTurnedIn then
+--             displayName = "|cffffff00" .. displayName .. "|r  |TInterface\\GossipFrame\\AvailableQuestIcon:16:16:0:0|t"
+--         end
+--         tempFont:SetText(displayName)
+--         local w = tempFont:GetStringWidth()
+--         if w > maxWidth then maxWidth = w end
+
+--         -- Check for objectives
+--         if q.objectives then
+--             for _, obj in ipairs(q.objectives) do
+--                 tempFont:SetText("    " .. obj.name)
+--                 local w2 = tempFont:GetStringWidth()
+--                 if w2 > maxWidth then maxWidth = w2 end
+--             end
+--         end
+--     end
+
+--     text:SetText("")
+--     text:SetWidth(maxWidth)
+--     local lineHeight = text:GetLineHeight()
+--     local totalLines = 0
+
+--     -- Draw quest lines and objectives
+--     local btnIdx, objBtnIdx = 1, 1
+--     for _, cat in ipairs(orderedCategories) do
+--         local catQuests = categories[cat]
+--         if catQuests and #catQuests > 0 then
+--             -- Draw category header
+--             local catBtn = questLineButtons[btnIdx] or CreateFrame("Button", nil, content)
+--             if not questLineButtons[btnIdx] then
+--                 catBtn.text = catBtn:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+--                 catBtn.text:SetJustifyH("LEFT")
+--                 catBtn.text:SetJustifyV("TOP")
+--                 catBtn.text:SetPoint("LEFT")
+--                 catBtn.text:SetPoint("RIGHT")
+--                 questLineButtons[btnIdx] = catBtn
+--             end
+--             catBtn:Show()
+--             catBtn:SetPoint("TOPLEFT", content, "TOPLEFT", 0, -((totalLines) * lineHeight))
+--             catBtn:SetSize(maxWidth, lineHeight)
+--             catBtn:SetHighlightTexture("")
+--             catBtn.text:SetFontObject(GameFontNormal)
+--             catBtn.text:SetText(cat)
+--             catBtn:SetScript("OnClick", nil)
+--             catBtn:SetScript("OnEnter", nil)
+--             catBtn:SetScript("OnLeave", nil)
+--             btnIdx = btnIdx + 1
+--             totalLines = totalLines + 1
+
+--             -- Draw quests in this category
+--             for _, q in ipairs(catQuests) do
+--                 -- Main quest line
+--                 local btn = questLineButtons[btnIdx] or CreateFrame("Button", nil, content)
+--                 if not questLineButtons[btnIdx] then
+--                     btn.text = btn:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+--                     btn.text:SetJustifyH("LEFT")
+--                     btn.text:SetJustifyV("TOP")
+--                     btn.text:SetPoint("LEFT")
+--                     btn.text:SetPoint("RIGHT")
+--                     questLineButtons[btnIdx] = btn
+--                 end
+--                 btn:Show()
+--                 btn:SetPoint("TOPLEFT", content, "TOPLEFT", 0, -((totalLines) * lineHeight))
+--                 btn:SetSize(maxWidth, lineHeight)
+--                 btn:SetHighlightTexture("Interface\\QuestFrame\\UI-QuestTitleHighlight")
+--                 local isComplete = IsQuestComplete(q.id)
+--                 local isTurnedIn = C_QuestLog.IsQuestFlaggedCompleted(q.id)
+--                 local displayName = q.name
+--                 if q.showProgress then
+--                     displayName = displayName .. getQuestProgressString(q.id)
+--                 end
+
+--                 -- Visual feedback for completed-but-not-turned-in quests (not Beasts of Fable)
+--                 if not q.objectives and isComplete and not isTurnedIn then
+--                     displayName = "|TInterface\\GossipFrame\\AvailableQuestIcon:16:16:0:0|t |cffffff00" .. displayName .. "|r"
+--                 end
+
+--                 btn.text:SetFontObject(GameFontHighlightSmall)
+--                 btn.text:SetText(displayName)
+--                 btn:SetScript("OnClick", nil)
+--                 btn:SetScript("OnEnter", nil)
+--                 btn:SetScript("OnLeave", nil)
+
+--                 if q.objectives then
+--                     -- Collapse/expand for Beasts of Fable
+--                     btn:SetScript("OnClick", function()
+--                         collapsedQuests[q.id] = not collapsedQuests[q.id]
+--                         updateQuestText()
+--                     end)
+--                     btn:SetScript("OnEnter", function(self)
+--                         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+--                         GameTooltip:SetText(collapsedQuests[q.id] and "Expand" or "Collapse", 1, 1, 1)
+--                         GameTooltip:Show()
+--                     end)
+--                     btn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+--                 elseif q.waypoint and TomTom then
+--                     btn:SetScript("OnClick", function()
+--                         if TomTom.RemoveAllWaypoints then
+--                             TomTom:RemoveAllWaypoints()
+--                         end
+--                         TomTom:AddWaypoint(q.waypoint.map, q.waypoint.x/100, q.waypoint.y/100, {title=q.waypoint.title or q.name})
+--                     end)
+--                     btn:SetScript("OnEnter", function(self)
+--                         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+--                         if isComplete and not isTurnedIn then
+--                             GameTooltip:SetText("Quest complete!\n|cffffcc00Don't forget to turn in for rewards!|r", 1, 1, 1)
+--                         else
+--                             GameTooltip:SetText("Set TomTom waypoint for " .. (q.waypoint.title or q.name), 1, 1, 1)
+--                         end
+--                         GameTooltip:Show()
+--                     end)
+--                     btn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+--                 end
+
+--                 btnIdx = btnIdx + 1
+--                 totalLines = totalLines + 1
+
+--                 -- Objectives (for Beasts of Fable)
+--                 if q.objectives and not collapsedQuests[q.id] then
+--                     local objectives = C_QuestLog.GetQuestObjectives(q.id)
+--                     for objIdx, beast in ipairs(q.objectives) do
+--                         local beastBtn = beastObjectiveButtons[objBtnIdx] or CreateFrame("Button", nil, content)
+--                         if not beastObjectiveButtons[objBtnIdx] then
+--                             beastBtn:SetHighlightTexture("Interface\\QuestFrame\\UI-QuestTitleHighlight")
+--                             beastBtn.text = beastBtn:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+--                             beastBtn.text:SetJustifyH("LEFT")
+--                             beastBtn.text:SetJustifyV("TOP")
+--                             beastBtn.text:SetPoint("LEFT")
+--                             beastBtn.text:SetPoint("RIGHT")
+--                             beastObjectiveButtons[objBtnIdx] = beastBtn
+--                         end
+--                         beastBtn:Show()
+--                         beastBtn:SetPoint("TOPLEFT", content, "TOPLEFT", 0, -((totalLines) * lineHeight))
+--                         beastBtn:SetSize(maxWidth, lineHeight)
+
+--                         -- Determine completion
+--                         local completed = false
+--                         if objectives and objectives[objIdx] and objectives[objIdx].finished then
+--                             completed = true
+--                         end
+
+--                         -- Visual feedback: strikethrough if completed, checkbox otherwise
+--                         local beastText = "    "
+--                         if completed then
+--                             beastText = beastText .. "|cFF888888|TInterface\\Buttons\\UI-CheckBox-Check:16:16:0:0|t|r " .. "|cFF888888" .. beast.name .. "|r"
+--                         else
+--                             beastText = beastText .. "|TInterface\\Buttons\\UI-CheckBox-Up:16:16:0:0|t " .. beast.name
+--                         end
+--                         beastBtn.text:SetText(beastText)
+
+--                         -- TomTom waypoint on click
+--                         beastBtn:SetScript("OnClick", nil)
+--                         beastBtn:SetScript("OnEnter", nil)
+--                         beastBtn:SetScript("OnLeave", nil)
+--                         if beast.waypoint and TomTom then
+--                             beastBtn:SetScript("OnClick", function()
+--                                 if TomTom.RemoveWaypoints then
+--                                     TomTom:RemoveWaypoints()
+--                                 end
+--                                 TomTom:AddWaypoint(beast.waypoint.map, beast.waypoint.x/100, beast.waypoint.y/100, {title=beast.waypoint.title or beast.name})
+--                             end)
+--                             beastBtn:SetScript("OnEnter", function(self)
+--                                 GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+--                                 GameTooltip:SetText("Set TomTom waypoint for " .. (beast.waypoint.title or beast.name), 1, 1, 1)
+--                                 GameTooltip:Show()
+--                             end)
+--                             beastBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+--                         end
+
+--                         objBtnIdx = objBtnIdx + 1
+--                         totalLines = totalLines + 1
+--                     end
+--                 end
+--             end
+
+--             -- Add 10px spacing after the category block, but not for the last one
+--             if cat ~= lastVisibleCategory then
+--                 totalLines = totalLines + (10 / lineHeight)
+--             end
+--         end
+--     end
+
+--     -- Hide unused buttons
+--     for i = btnIdx, #questLineButtons do
+--         questLineButtons[i]:Hide()
+--     end
+--     for i = objBtnIdx, #beastObjectiveButtons do
+--         beastObjectiveButtons[i]:Hide()
+--     end
+
+--     if totalLines > 0 then
+--         frame:SetSize(maxWidth + PADDING * 2, totalLines * lineHeight + PADDING * 2)
+--         frame:Show()
+--     else
+--         frame:Hide()
+--     end
+-- end
+
 local function updateQuestText()
     local playerFaction = UnitFactionGroup("player")
     local questEntries = {}
@@ -325,7 +612,7 @@ local function updateQuestText()
         "Darkmoon Island", "Pandaria", "PvP", "Other"
     }
 
-    -- Find the last category that will actually be displayed
+    -- Find last visible category
     local lastVisibleCategory
     for i = #orderedCategories, 1, -1 do
         local catName = orderedCategories[i]
@@ -335,35 +622,41 @@ local function updateQuestText()
         end
     end
 
-    -- Find the widest line for sizing
+    -- Measure max width (include plus/minus icon in measurement)
     local maxWidth = 0
     local tempFont = text
 
-    -- Check category header widths (they use a different, larger font)
     tempFont:SetFontObject(GameFontNormal)
     for catName, _ in pairs(categories) do
         tempFont:SetText(catName)
         local w = tempFont:GetStringWidth()
         if w > maxWidth then maxWidth = w end
     end
-    tempFont:SetFontObject(GameFontHighlightSmall) -- Set it back for quests
+    tempFont:SetFontObject(GameFontHighlightSmall)
 
     for _, q in ipairs(questEntries) do
         local isComplete = IsQuestComplete(q.id)
         local isTurnedIn = C_QuestLog.IsQuestFlaggedCompleted(q.id)
+
         local displayName = q.name
         if q.showProgress then
             displayName = displayName .. getQuestProgressString(q.id)
         end
-        -- Add the "!" icon at the end if completed-but-not-turned-in
-        if not q.objectives and isComplete and not isTurnedIn then
-            displayName = "|cffffff00" .. displayName .. "|r  |TInterface\\GossipFrame\\AvailableQuestIcon:16:16:0:0|t"
+
+        if q.objectives then
+            local isCollapsed = (collapsedQuests[q.id] == nil) and true or collapsedQuests[q.id]
+            local icon = isCollapsed
+                and "|TInterface\\Buttons\\UI-PlusButton-Up:14:14:0:0|t "
+                or "|TInterface\\Buttons\\UI-MinusButton-Up:14:14:0:0|t "
+            displayName = icon .. displayName
+        elseif isComplete and not isTurnedIn then
+            displayName = "|TInterface\\GossipFrame\\AvailableQuestIcon:16:16:0:0|t |cffffff00" .. displayName .. "|r"
         end
+
         tempFont:SetText(displayName)
         local w = tempFont:GetStringWidth()
         if w > maxWidth then maxWidth = w end
 
-        -- Check for objectives
         if q.objectives then
             for _, obj in ipairs(q.objectives) do
                 tempFont:SetText("    " .. obj.name)
@@ -373,17 +666,18 @@ local function updateQuestText()
         end
     end
 
+    -- Draw
     text:SetText("")
     text:SetWidth(maxWidth)
     local lineHeight = text:GetLineHeight()
     local totalLines = 0
-
-    -- Draw quest lines and objectives
+    local entrySpacing = 2 / lineHeight -- 2px in units of lineHeight
     local btnIdx, objBtnIdx = 1, 1
+
     for _, cat in ipairs(orderedCategories) do
         local catQuests = categories[cat]
         if catQuests and #catQuests > 0 then
-            -- Draw category header
+            -- Category header
             local catBtn = questLineButtons[btnIdx] or CreateFrame("Button", nil, content)
             if not questLineButtons[btnIdx] then
                 catBtn.text = catBtn:CreateFontString(nil, "OVERLAY", "GameFontNormal")
@@ -394,20 +688,15 @@ local function updateQuestText()
                 questLineButtons[btnIdx] = catBtn
             end
             catBtn:Show()
-            catBtn:SetPoint("TOPLEFT", content, "TOPLEFT", 0, -((totalLines) * lineHeight))
+            catBtn:SetPoint("TOPLEFT", content, "TOPLEFT", 0, -(totalLines * lineHeight))
             catBtn:SetSize(maxWidth, lineHeight)
-            catBtn:SetHighlightTexture("")
             catBtn.text:SetFontObject(GameFontNormal)
             catBtn.text:SetText(cat)
-            catBtn:SetScript("OnClick", nil)
-            catBtn:SetScript("OnEnter", nil)
-            catBtn:SetScript("OnLeave", nil)
             btnIdx = btnIdx + 1
-            totalLines = totalLines + 1
+            totalLines = totalLines + 1 + entrySpacing
 
-            -- Draw quests in this category
+            -- Quests
             for _, q in ipairs(catQuests) do
-                -- Main quest line
                 local btn = questLineButtons[btnIdx] or CreateFrame("Button", nil, content)
                 if not questLineButtons[btnIdx] then
                     btn.text = btn:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
@@ -418,9 +707,10 @@ local function updateQuestText()
                     questLineButtons[btnIdx] = btn
                 end
                 btn:Show()
-                btn:SetPoint("TOPLEFT", content, "TOPLEFT", 0, -((totalLines) * lineHeight))
+                btn:SetPoint("TOPLEFT", content, "TOPLEFT", 0, -(totalLines * lineHeight))
                 btn:SetSize(maxWidth, lineHeight)
                 btn:SetHighlightTexture("Interface\\QuestFrame\\UI-QuestTitleHighlight")
+
                 local isComplete = IsQuestComplete(q.id)
                 local isTurnedIn = C_QuestLog.IsQuestFlaggedCompleted(q.id)
                 local displayName = q.name
@@ -428,93 +718,95 @@ local function updateQuestText()
                     displayName = displayName .. getQuestProgressString(q.id)
                 end
 
-                -- Visual feedback for completed-but-not-turned-in quests (not Beasts of Fable)
-                if not q.objectives and isComplete and not isTurnedIn then
-                    displayName = "|TInterface\\GossipFrame\\AvailableQuestIcon:16:16:0:0|t |cffffff00" .. displayName .. "|r"
-                end
-
-                btn.text:SetFontObject(GameFontHighlightSmall)
-                btn.text:SetText(displayName)
-                btn:SetScript("OnClick", nil)
-                btn:SetScript("OnEnter", nil)
-                btn:SetScript("OnLeave", nil)
-
                 if q.objectives then
-                    -- Collapse/expand for Beasts of Fable
+                    local isCollapsed = (collapsedQuests[q.id] == nil) and true or collapsedQuests[q.id]
+                    local icon = isCollapsed
+                        and "|TInterface\\Buttons\\UI-PlusButton-Up:14:14:0:0|t "
+                        or "|TInterface\\Buttons\\UI-MinusButton-Up:14:14:0:0|t "
+                    displayName = icon .. displayName
+
+                    local qid = q.id
                     btn:SetScript("OnClick", function()
-                        collapsedQuests[q.id] = not collapsedQuests[q.id]
+                        collapsedQuests[qid] = not ((collapsedQuests[qid] == nil) and true or collapsedQuests[qid])
                         updateQuestText()
                     end)
                     btn:SetScript("OnEnter", function(self)
                         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-                        GameTooltip:SetText(collapsedQuests[q.id] and "Expand" or "Collapse", 1, 1, 1)
+                        local isCollapsed = (collapsedQuests[qid] == nil) and true or collapsedQuests[qid]
+                        GameTooltip:SetText(isCollapsed and "Expand" or "Collapse", 1, 1, 1)
                         GameTooltip:Show()
                     end)
                     btn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+
+                elseif isComplete and not isTurnedIn then
+                    displayName = "|TInterface\\GossipFrame\\AvailableQuestIcon:16:16:0:0|t |cffffff00" .. displayName .. "|r"
+                    if q.waypoint and TomTom then
+                        btn:SetScript("OnClick", function()
+                            if TomTom.RemoveAllWaypoints then TomTom:RemoveAllWaypoints() end
+                            TomTom:AddWaypoint(q.waypoint.map, q.waypoint.x/100, q.waypoint.y/100, {title=q.waypoint.title or q.name})
+                        end)
+                    end
                 elseif q.waypoint and TomTom then
                     btn:SetScript("OnClick", function()
-                        if TomTom.RemoveAllWaypoints then
-                            TomTom:RemoveAllWaypoints()
-                        end
+                        if TomTom.RemoveAllWaypoints then TomTom:RemoveAllWaypoints() end
                         TomTom:AddWaypoint(q.waypoint.map, q.waypoint.x/100, q.waypoint.y/100, {title=q.waypoint.title or q.name})
                     end)
-                    btn:SetScript("OnEnter", function(self)
-                        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-                        if isComplete and not isTurnedIn then
-                            GameTooltip:SetText("Quest complete!\n|cffffcc00Don't forget to turn in for rewards!|r", 1, 1, 1)
-                        else
-                            GameTooltip:SetText("Set TomTom waypoint for " .. (q.waypoint.title or q.name), 1, 1, 1)
-                        end
-                        GameTooltip:Show()
-                    end)
-                    btn:SetScript("OnLeave", function() GameTooltip:Hide() end)
                 end
 
-                btnIdx = btnIdx + 1
-                totalLines = totalLines + 1
+                btn.text:SetFontObject(GameFontHighlightSmall)
+                btn.text:SetText(displayName)
 
-                -- Objectives (for Beasts of Fable)
-                if q.objectives and not collapsedQuests[q.id] then
+                btnIdx = btnIdx + 1
+                totalLines = totalLines + 1 + entrySpacing
+
+                -- Objectives if expanded: use Texture icons instead of inline tag
+                if q.objectives and not ((collapsedQuests[q.id] == nil) and true or collapsedQuests[q.id]) then
                     local objectives = C_QuestLog.GetQuestObjectives(q.id)
                     for objIdx, beast in ipairs(q.objectives) do
                         local beastBtn = beastObjectiveButtons[objBtnIdx] or CreateFrame("Button", nil, content)
                         if not beastObjectiveButtons[objBtnIdx] then
                             beastBtn:SetHighlightTexture("Interface\\QuestFrame\\UI-QuestTitleHighlight")
+
+                            -- icon texture (checkbox)
+                            beastBtn.icon = beastBtn:CreateTexture(nil, "ARTWORK")
+                            beastBtn.icon:SetSize(16, 16)
+                            beastBtn.icon:SetPoint("LEFT", beastBtn, "LEFT", 4, 0)
+
+                            -- text placed to the right of the icon
                             beastBtn.text = beastBtn:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
                             beastBtn.text:SetJustifyH("LEFT")
                             beastBtn.text:SetJustifyV("TOP")
-                            beastBtn.text:SetPoint("LEFT")
+                            beastBtn.text:SetPoint("LEFT", beastBtn.icon, "RIGHT", 6, 0)
                             beastBtn.text:SetPoint("RIGHT")
+
                             beastObjectiveButtons[objBtnIdx] = beastBtn
                         end
+
                         beastBtn:Show()
-                        beastBtn:SetPoint("TOPLEFT", content, "TOPLEFT", 0, -((totalLines) * lineHeight))
+                        beastBtn:SetPoint("TOPLEFT", content, "TOPLEFT", 0, -(totalLines * lineHeight))
                         beastBtn:SetSize(maxWidth, lineHeight)
 
                         -- Determine completion
-                        local completed = false
-                        if objectives and objectives[objIdx] and objectives[objIdx].finished then
-                            completed = true
-                        end
+                        local completed = objectives and objectives[objIdx] and objectives[objIdx].finished
 
-                        -- Visual feedback: strikethrough if completed, checkbox otherwise
-                        local beastText = "    "
+                        -- Set icon texture and text color
                         if completed then
-                            beastText = beastText .. "|cFF888888|TInterface\\Buttons\\UI-CheckBox-Check:16:16:0:0|t|r " .. "|cFF888888" .. beast.name .. "|r"
+                            beastBtn.icon:SetTexture("Interface\\Buttons\\UI-CheckBox-Check")
+                            beastBtn.icon:SetVertexColor(0.53, 0.53, 0.53) -- grey
+                            beastBtn.text:SetText("|cFF888888" .. beast.name .. "|r")
                         else
-                            beastText = beastText .. "|TInterface\\Buttons\\UI-CheckBox-Up:16:16:0:0|t " .. beast.name
+                            beastBtn.icon:SetTexture("Interface\\Buttons\\UI-CheckBox-Up")
+                            beastBtn.icon:SetVertexColor(1, 1, 1)
+                            beastBtn.text:SetText(beast.name)
                         end
-                        beastBtn.text:SetText(beastText)
 
-                        -- TomTom waypoint on click
+                        -- TomTom waypoint on click (if exists)
                         beastBtn:SetScript("OnClick", nil)
                         beastBtn:SetScript("OnEnter", nil)
                         beastBtn:SetScript("OnLeave", nil)
                         if beast.waypoint and TomTom then
                             beastBtn:SetScript("OnClick", function()
-                                if TomTom.RemoveWaypoints then
-                                    TomTom:RemoveWaypoints()
-                                end
+                                if TomTom.RemoveWaypoints then TomTom:RemoveWaypoints() end
                                 TomTom:AddWaypoint(beast.waypoint.map, beast.waypoint.x/100, beast.waypoint.y/100, {title=beast.waypoint.title or beast.name})
                             end)
                             beastBtn:SetScript("OnEnter", function(self)
@@ -526,12 +818,13 @@ local function updateQuestText()
                         end
 
                         objBtnIdx = objBtnIdx + 1
-                        totalLines = totalLines + 1
+                        totalLines = totalLines + 1 + entrySpacing
                     end
                 end
             end
 
-            -- Add 10px spacing after the category block, but not for the last one
+            -- Remove the spacing from the last item before adding the category gap
+            totalLines = totalLines - entrySpacing
             if cat ~= lastVisibleCategory then
                 totalLines = totalLines + (10 / lineHeight)
             end
@@ -539,20 +832,19 @@ local function updateQuestText()
     end
 
     -- Hide unused buttons
-    for i = btnIdx, #questLineButtons do
-        questLineButtons[i]:Hide()
-    end
-    for i = objBtnIdx, #beastObjectiveButtons do
-        beastObjectiveButtons[i]:Hide()
-    end
+    for i = btnIdx, #questLineButtons do questLineButtons[i]:Hide() end
+    for i = objBtnIdx, #beastObjectiveButtons do beastObjectiveButtons[i]:Hide() end
 
     if totalLines > 0 then
+        -- Remove trailing space from the very last item for the final height calculation
+        totalLines = totalLines - entrySpacing
         frame:SetSize(maxWidth + PADDING * 2, totalLines * lineHeight + PADDING * 2)
         frame:Show()
     else
         frame:Hide()
     end
 end
+
 
 local function updateTracker()
     -- Only show the frame if the Safari Hat is equipped
