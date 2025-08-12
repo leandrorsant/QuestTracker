@@ -48,19 +48,53 @@ local DEFAULT_TEXT_WIDTH = 260
 
 text:SetWidth(DEFAULT_TEXT_WIDTH)
 
+-- local function getQuestProgressString(questID)
+--     local objectives = C_QuestLog.GetQuestObjectives(questID)
+--     if not objectives then return "" end
+
+--     local completed = 0
+--     for i = 1, #objectives do
+--         local obj = objectives[i]
+--         if obj.finished then
+--             completed = completed + 1
+--         end
+--     end
+--     return string.format(" (%d/%d)", completed, #objectives)
+-- end
+
 local function getQuestProgressString(questID)
     local objectives = C_QuestLog.GetQuestObjectives(questID)
-    if not objectives then return "" end
+    if not objectives or #objectives == 0 then return "" end
 
-    local completed = 0
-    for i = 1, #objectives do
-        local obj = objectives[i]
-        if obj.finished then
-            completed = completed + 1
+    local totalFulfilled = 0
+    local totalRequired = 0
+    local hasNumeric = false
+
+    for _, obj in ipairs(objectives) do
+        if obj.numFulfilled and obj.numRequired and obj.numRequired > 0 then
+            hasNumeric = true
+            totalFulfilled = totalFulfilled + obj.numFulfilled
+            totalRequired = totalRequired + obj.numRequired
         end
     end
-    return string.format(" (%d/%d)", completed, #objectives)
+
+    if hasNumeric then
+        return string.format(" (%d/%d)", totalFulfilled, totalRequired)
+    else
+        -- Fallback: count how many objectives are done out of total objectives
+        local completed = 0
+        for _, obj in ipairs(objectives) do
+            if obj.finished then
+                completed = completed + 1
+            end
+        end
+        return string.format(" (%d/%d)", completed, #objectives)
+    end
 end
+
+
+
+
 
 local dmfActive = false
 
@@ -378,22 +412,27 @@ local function updateQuestText()
         local isComplete = IsQuestComplete(q.id)
         local isTurnedIn = C_QuestLog.IsQuestFlaggedCompleted(q.id)
         local displayName = q.name
-        if q.showProgress then
+
+        if (q.showProgress or q.category == "PvP") then
             displayName = displayName .. getQuestProgressString(q.id)
         end
 
+        -- Add icon prefix if quest has objectives (collapsed/expanded icon)
+        local iconWidth = 0
         if q.objectives then
             local isCollapsed = (collapsedQuests[q.id] == nil) and true or collapsedQuests[q.id]
             local icon = isCollapsed
                 and "|TInterface\\Buttons\\UI-PlusButton-Up:14:14:0:0|t "
                 or "|TInterface\\Buttons\\UI-MinusButton-Up:14:14:0:0|t "
             displayName = icon .. displayName
+            iconWidth = 16 + 2 -- icon size + padding (adjust if needed)
         elseif isComplete and not isTurnedIn then
             displayName = "|TInterface\\GossipFrame\\AvailableQuestIcon:16:16:0:0|t |cffffff00" .. displayName .. "|r"
+            iconWidth = 16 + 2
         end
 
         tempFont:SetText(displayName)
-        local w = tempFont:GetStringWidth()
+        local w = tempFont:GetStringWidth() + iconWidth
         if w > maxWidth then maxWidth = w end
 
         if q.objectives then
@@ -453,7 +492,7 @@ local function updateQuestText()
                 local isComplete = IsQuestComplete(q.id)
                 local isTurnedIn = C_QuestLog.IsQuestFlaggedCompleted(q.id)
                 local displayName = q.name
-                if q.showProgress then
+                if (q.showProgress or q.category == "PvP") then
                     displayName = displayName .. getQuestProgressString(q.id)
                 end
 
@@ -498,7 +537,6 @@ local function updateQuestText()
                     end)
                 end
 
-                -- Grey out quest name if missing
                 if missingQuest then
                     btn.text:SetFontObject(GameFontDisableSmall)
                 else
@@ -534,7 +572,6 @@ local function updateQuestText()
                         local completed = objectives and objectives[objIdx] and objectives[objIdx].finished
                         local grey = missingQuest or completed
 
-                        -- Set icon and text color
                         if completed then
                             beastBtn.icon:SetTexture("Interface\\Buttons\\UI-CheckBox-Check")
                         else
@@ -548,7 +585,6 @@ local function updateQuestText()
                             beastBtn.text:SetText(beast.name)
                         end
 
-                        -- Tooltip for missing quest
                         beastBtn:SetScript("OnEnter", nil)
                         beastBtn:SetScript("OnLeave", nil)
                         if missingQuest then
@@ -597,10 +633,16 @@ end
 
 
 
+function GetItemBuff(itemID)
+    local buffName, spellID = C_Item.GetItemSpell(itemID)
+    if buffName and C_UnitAuras.GetPlayerAuraBySpellID(spellID) then
+        return buffName, spellID
+    end
+end
 
 local function updateTracker()
     -- Only show the frame if the Safari Hat is equipped
-    if not IsEquippedItem(SAFARI_HAT_ID) then
+    if not GetItemBuff(SAFARI_HAT_ID) then
         frame:Hide()
         return
     end
@@ -623,7 +665,7 @@ end
 -- Events
 frame:RegisterEvent("ADDON_LOADED")
 frame:RegisterEvent("PLAYER_ENTERING_WORLD")
-frame:RegisterEvent("PLAYER_EQUIPMENT_CHANGED")
+frame:RegisterEvent("UNIT_AURA")
 frame:RegisterEvent("QUEST_ACCEPTED")
 frame:RegisterEvent("QUEST_TURNED_IN")
 frame:RegisterEvent("QUEST_LOG_UPDATE")
