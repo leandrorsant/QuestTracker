@@ -526,14 +526,14 @@ local function updateQuestText()
                     displayName = "|TInterface\\GossipFrame\\AvailableQuestIcon:16:16:0:0|t |cffffff00" .. displayName .. "|r"
                     if q.waypoint and TomTom then
                         btn:SetScript("OnClick", function()
-                            if TomTom.RemoveAllWaypoints then TomTom:RemoveAllWaypoints() end
-                            TomTom:AddWaypoint(q.waypoint.map, q.waypoint.x/100, q.waypoint.y/100, {title=q.waypoint.title or q.name})
+                            local uid = TomTom:AddWaypoint(q.waypoint.map, q.waypoint.x/100, q.waypoint.y/100, {title=q.waypoint.title or q.name})
+                            TomTom:SetCrazyArrow(uid, 5, q.waypoint.title or q.name)
                         end)
                     end
                 elseif q.waypoint and TomTom then
                     btn:SetScript("OnClick", function()
-                        if TomTom.RemoveAllWaypoints then TomTom:RemoveAllWaypoints() end
-                        TomTom:AddWaypoint(q.waypoint.map, q.waypoint.x/100, q.waypoint.y/100, {title=q.waypoint.title or q.name})
+                        local uid = TomTom:AddWaypoint(q.waypoint.map, q.waypoint.x/100, q.waypoint.y/100, {title=q.waypoint.title or q.name})
+                        TomTom:SetCrazyArrow(uid, 5, q.waypoint.title or q.name)
                     end)
                 end
 
